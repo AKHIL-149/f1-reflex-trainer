@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F1 Reaction Training Drill</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏎️ F1 REACTION TRAINING DRILL</h1>
+            <p class="tagline">Train like a champion driver</p>
+        </header>
+
+        <div class="difficulty-selector">
+            <h3>Select Difficulty</h3>
+            <div class="difficulty-buttons">
+                <button class="difficulty-btn" data-difficulty="easy">Easy (3-5s)</button>
+                <button class="difficulty-btn active" data-difficulty="medium">Medium (2-4s)</button>
+                <button class="difficulty-btn" data-difficulty="hard">Hard (1-3s)</button>
+            </div>
+        </div>
+
+        <div class="games-container">
+            <!-- Game 1: Left/Right Buzzer -->
+            <div class="game-card" id="game1">
+                <div class="game-header">
+                    <h2>Game 1: Left/Right Buzzer</h2>
+                    <p>Press the correct buzzer when called</p>
+                </div>
+
+                <div class="game-status" id="game1-status">
+                    <div class="status-message">Ready to start</div>
+                    <div class="callout-display" id="callout-display"></div>
+                </div>
+
+                <div class="buzzer-container">
+                    <button class="buzzer buzzer-left" id="left-buzzer" disabled>
+                        <span>LEFT</span>
+                    </button>
+                    <button class="buzzer buzzer-right" id="right-buzzer" disabled>
+                        <span>RIGHT</span>
+                    </button>
+                </div>
+
+                <div class="game-controls">
+                    <button class="control-btn start-btn" id="game1-start">Start Game 1</button>
+                    <button class="control-btn stop-btn" id="game1-stop" disabled>Stop</button>
+                </div>
+
+                <div class="stats" id="game1-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Attempts:</span>
+                        <span class="stat-value" id="game1-attempts">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Correct:</span>
+                        <span class="stat-value correct" id="game1-correct">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Wrong:</span>
+                        <span class="stat-value wrong" id="game1-wrong">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Missed:</span>
+                        <span class="stat-value missed" id="game1-missed">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Avg Time:</span>
+                        <span class="stat-value" id="game1-avg-time">0ms</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Last Time:</span>
+                        <span class="stat-value" id="game1-last-time">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game 2: Ball Drop Catch -->
+            <div class="game-card" id="game2">
+                <div class="game-header">
+                    <h2>Game 2: Ball Drop Catch</h2>
+                    <p>Drop and catch on callout</p>
+                </div>
+
+                <div class="game-status" id="game2-status">
+                    <div class="status-message">Ready to start</div>
+                    <div class="callout-display" id="game2-callout-display"></div>
+                </div>
+
+                <div class="ball-container">
+                    <div class="instruction">Hold the ball. Drop and catch when called!</div>
+                    <div class="action-buttons">
+                        <button class="action-btn" id="caught-btn" disabled>
+                            ✓ Caught
+                        </button>
+                        <button class="action-btn miss-btn" id="missed-btn" disabled>
+                            ✗ Missed
+                        </button>
+                    </div>
+                </div>
+
+                <div class="game-controls">
+                    <button class="control-btn start-btn" id="game2-start">Start Game 2</button>
+                    <button class="control-btn stop-btn" id="game2-stop" disabled>Stop</button>
+                </div>
+
+                <div class="stats" id="game2-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Rounds:</span>
+                        <span class="stat-value" id="game2-rounds">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Caught:</span>
+                        <span class="stat-value correct" id="game2-caught">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Missed:</span>
+                        <span class="stat-value missed" id="game2-missed-count">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Success Rate:</span>
+                        <span class="stat-value" id="game2-success-rate">0%</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Avg Time:</span>
+                        <span class="stat-value" id="game2-avg-time">0ms</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Last Time:</span>
+                        <span class="stat-value" id="game2-last-time">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

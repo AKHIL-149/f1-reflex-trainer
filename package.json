@@ -1,0 +1,25 @@
+{
+  "name": "f1-reaction-training-drill",
+  "version": "1.0.0",
+  "description": "F1 Reaction Training Drill - Train your reflexes like an F1 driver",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "engines": {
+    "node": "18.x"
+  },
+  "keywords": [
+    "f1",
+    "reaction",
+    "training",
+    "reflex",
+    "drill"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
