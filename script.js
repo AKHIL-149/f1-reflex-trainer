@@ -2,12 +2,31 @@
 
 // Difficulty settings
 const DIFFICULTY_SETTINGS = {
-    easy: { min: 3000, max: 5000 },
-    medium: { min: 2000, max: 4000 },
-    hard: { min: 1000, max: 3000 }
+    easy: { min: 3000, max: 5000, catchWindow: 3000, dropDelay: 15000 },
+    medium: { min: 2000, max: 4000, catchWindow: 2500, dropDelay: 11000 },
+    hard: { min: 1000, max: 3000, catchWindow: 2000, dropDelay: 7000 }
 };
 
 let currentDifficulty = 'medium';
+
+// Get custom drop delay from user settings
+function getDropDelay() {
+    const difficultyMap = {
+        'easy': 'easy-time',
+        'medium': 'medium-time',
+        'hard': 'hard-time'
+    };
+
+    const inputId = difficultyMap[currentDifficulty];
+    const inputElement = document.getElementById(inputId);
+
+    if (inputElement) {
+        const seconds = parseInt(inputElement.value) || DIFFICULTY_SETTINGS[currentDifficulty].dropDelay / 1000;
+        return seconds * 1000; // Convert to milliseconds
+    }
+
+    return DIFFICULTY_SETTINGS[currentDifficulty].dropDelay;
+}
 
 // Audio Context for beep sounds
 let audioContext;
@@ -250,10 +269,7 @@ const game2 = {
     startTime: null,
     timeoutId: null,
     stats: {
-        rounds: 0,
-        caught: 0,
-        missed: 0,
-        reactionTimes: []
+        rounds: 0
     }
 };
 
@@ -262,10 +278,7 @@ function startGame2() {
 
     // Reset stats
     game2.stats = {
-        rounds: 0,
-        caught: 0,
-        missed: 0,
-        reactionTimes: []
+        rounds: 0
     };
     updateGame2Stats();
 
@@ -293,8 +306,10 @@ function stopGame2() {
 
     document.getElementById('game2-start').disabled = false;
     document.getElementById('game2-stop').disabled = true;
-    document.getElementById('caught-btn').disabled = true;
-    document.getElementById('missed-btn').disabled = true;
+    const catchZone = document.getElementById('catch-zone');
+    const timerBar = document.getElementById('timer-bar');
+    catchZone.disabled = true;
+    timerBar.classList.remove('active');
     document.getElementById('game2-callout-display').textContent = '';
 
     speak('Game 2 stopped');
@@ -306,8 +321,10 @@ function nextGame2Round() {
 
     updateGame2Status('Hold the ball... wait for callout');
     document.getElementById('game2-callout-display').textContent = '';
-    document.getElementById('caught-btn').disabled = true;
-    document.getElementById('missed-btn').disabled = true;
+    const catchZone = document.getElementById('catch-zone');
+    const timerBar = document.getElementById('timer-bar');
+    catchZone.disabled = true;
+    timerBar.classList.remove('active');
 
     // Random delay before callout
     const delay = getRandomDelay();
@@ -315,67 +332,125 @@ function nextGame2Round() {
     game2.timeoutId = setTimeout(() => {
         if (!game2.isActive) return;
 
-        // Random callout - mix of "Drop", "Drop and Catch", "Release", "Let go"
-        const callouts = ['Drop', 'Drop and Catch', 'Release', 'Let go', 'Drop it'];
-        const callout = callouts[Math.floor(Math.random() * callouts.length)];
+        // Determine hand selection based on difficulty
+        let handSelection;
+        const random = Math.random();
+
+        if (currentDifficulty === 'easy') {
+            // Easy: Only left or right, no both hands
+            handSelection = random < 0.5 ? 'left' : 'right';
+        } else if (currentDifficulty === 'medium') {
+            // Medium: 10% both hands, 45% left, 45% right
+            if (random < 0.1) {
+                handSelection = 'both';
+            } else if (random < 0.55) {
+                handSelection = 'left';
+            } else {
+                handSelection = 'right';
+            }
+        } else if (currentDifficulty === 'hard') {
+            // Hard: 30% both hands, 35% left, 35% right
+            if (random < 0.3) {
+                handSelection = 'both';
+            } else if (random < 0.65) {
+                handSelection = 'left';
+            } else {
+                handSelection = 'right';
+            }
+        }
+
+        // Generate callout based on hand selection
+        let callout;
+        if (handSelection === 'both') {
+            callout = 'Both Hands Drop and Catch';
+        } else if (handSelection === 'left') {
+            const leftCallouts = ['Left Hand Drop', 'Left Hand Catch', 'Drop with Left', 'Left Hand'];
+            callout = leftCallouts[Math.floor(Math.random() * leftCallouts.length)];
+        } else {
+            const rightCallouts = ['Right Hand Drop', 'Right Hand Catch', 'Drop with Right', 'Right Hand'];
+            callout = rightCallouts[Math.floor(Math.random() * rightCallouts.length)];
+        }
 
         game2.isDropCallout = true;
         game2.startTime = Date.now();
-        game2.stats.rounds++;
 
         // Display and speak
         document.getElementById('game2-callout-display').textContent = callout.toUpperCase();
         speak(callout);
-        playBeep(500, 300);
 
-        updateGame2Status('Drop and catch now!');
+        // Different beep frequencies for different hands
+        if (handSelection === 'both') {
+            playBeep(500, 300);
+        } else if (handSelection === 'left') {
+            playBeep(400, 300);
+        } else {
+            playBeep(600, 300);
+        }
 
-        // Enable response buttons
-        document.getElementById('caught-btn').disabled = false;
-        document.getElementById('missed-btn').disabled = false;
+        updateGame2Status('Drop and catch with the called hand!');
 
-        // Auto-advance after 5 seconds if no response
+        // Enable catch zone
+        catchZone.disabled = false;
+
+        // Start timer animation
+        const catchWindow = DIFFICULTY_SETTINGS[currentDifficulty].catchWindow;
+        timerBar.style.animationDuration = `${catchWindow}ms`;
+        timerBar.classList.add('active');
+
+        // Auto-advance after catch window expires
         game2.timeoutId = setTimeout(() => {
             if (game2.isActive && game2.isDropCallout) {
-                handleGame2Response(false);
+                handleGame2Response();
             }
-        }, 5000);
+        }, catchWindow);
     }, delay);
 }
 
-function handleGame2Response(caught) {
+function handleGame2Response() {
     if (!game2.isActive || !game2.isDropCallout) return;
 
     clearTimeout(game2.timeoutId);
 
-    const reactionTime = Date.now() - game2.startTime;
-    game2.stats.reactionTimes.push(reactionTime);
+    const catchZone = document.getElementById('catch-zone');
+    const timerBar = document.getElementById('timer-bar');
 
-    if (caught) {
-        game2.stats.caught++;
-        playBeep(800, 200);
-        speak('Great catch');
-        updateGame2Status(`Caught! Reaction: ${reactionTime}ms`);
-        flashCard('game2', 'correct');
-    } else {
-        game2.stats.missed++;
-        playBeep(200, 400);
-        speak('Missed');
-        updateGame2Status('Missed the catch. Try again!');
-        flashCard('game2', 'missed');
-    }
+    // Disable catch zone and stop timer
+    catchZone.disabled = true;
+    timerBar.classList.remove('active');
 
-    game2.isDropCallout = false;
-    document.getElementById('caught-btn').disabled = true;
-    document.getElementById('missed-btn').disabled = true;
+    // Increment rounds and update stats
+    game2.stats.rounds++;
     updateGame2Stats();
 
-    // Next round after short delay
+    // Simple acknowledgment
+    playBeep(800, 200);
+    updateGame2Status('Round complete!');
+
+    game2.isDropCallout = false;
+
+    // Next round after drop delay (gives time for physical drop-catch)
+    const dropDelay = getDropDelay();
+    const nextRoundTime = Math.floor(dropDelay / 1000);
+
+    // Show countdown
+    let countdown = nextRoundTime;
+    updateGame2Status(`Get ready... next round in ${countdown}s`);
+
+    const countdownInterval = setInterval(() => {
+        countdown--;
+        if (countdown > 0 && game2.isActive) {
+            updateGame2Status(`Get ready... next round in ${countdown}s`);
+        } else {
+            clearInterval(countdownInterval);
+        }
+    }, 1000);
+
     setTimeout(() => {
+        clearInterval(countdownInterval);
         if (game2.isActive) {
             nextGame2Round();
         }
-    }, 1500);
+    }, dropDelay);
 }
 
 function updateGame2Status(message) {
@@ -384,23 +459,6 @@ function updateGame2Status(message) {
 
 function updateGame2Stats() {
     document.getElementById('game2-rounds').textContent = game2.stats.rounds;
-    document.getElementById('game2-caught').textContent = game2.stats.caught;
-    document.getElementById('game2-missed-count').textContent = game2.stats.missed;
-
-    const successRate = game2.stats.rounds > 0
-        ? Math.round((game2.stats.caught / game2.stats.rounds) * 100)
-        : 0;
-    document.getElementById('game2-success-rate').textContent = `${successRate}%`;
-
-    if (game2.stats.reactionTimes.length > 0) {
-        const avgTime = Math.round(
-            game2.stats.reactionTimes.reduce((a, b) => a + b, 0) / game2.stats.reactionTimes.length
-        );
-        const lastTime = game2.stats.reactionTimes[game2.stats.reactionTimes.length - 1];
-
-        document.getElementById('game2-avg-time').textContent = `${avgTime}ms`;
-        document.getElementById('game2-last-time').textContent = `${lastTime}ms`;
-    }
 }
 
 // ===========================
@@ -420,28 +478,72 @@ function flashCard(gameId, type) {
 // ===========================
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Difficulty selection
-    document.querySelectorAll('.difficulty-btn').forEach(btn => {
+    // Game selection menu
+    document.querySelectorAll('.game-menu-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
+            // Stop any active games before switching
+            if (game1.isActive) {
+                stopGame1();
+            }
+            if (game2.isActive) {
+                stopGame2();
+            }
+
+            // Update active button
+            document.querySelectorAll('.game-menu-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            currentDifficulty = btn.dataset.difficulty;
-            speak(`Difficulty set to ${currentDifficulty}`);
+
+            // Show selected game
+            const selectedGame = btn.dataset.game;
+            document.querySelectorAll('.game-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            document.getElementById(selectedGame).classList.add('active');
+
+            // Announce game selection
+            const gameName = btn.querySelector('.game-title').textContent;
+            speak(`${gameName} selected`);
             playBeep(600, 150);
         });
+    });
+
+    // Difficulty selection (dropdown)
+    document.getElementById('difficulty-select').addEventListener('change', (e) => {
+        currentDifficulty = e.target.value;
+        speak(`Difficulty set to ${currentDifficulty}`);
+        playBeep(600, 150);
     });
 
     // Game 1 controls
     document.getElementById('game1-start').addEventListener('click', startGame1);
     document.getElementById('game1-stop').addEventListener('click', stopGame1);
 
-    document.getElementById('left-buzzer').addEventListener('click', () => {
+    // Buzzer interactions (support both click and touch)
+    const leftBuzzer = document.getElementById('left-buzzer');
+    const rightBuzzer = document.getElementById('right-buzzer');
+
+    leftBuzzer.addEventListener('click', () => {
         handleGame1Response('left');
     });
 
-    document.getElementById('right-buzzer').addEventListener('click', () => {
+    rightBuzzer.addEventListener('click', () => {
         handleGame1Response('right');
     });
+
+    // Touch support for mobile
+    leftBuzzer.addEventListener('touchstart', (e) => {
+        if (!leftBuzzer.disabled) {
+            e.preventDefault();
+            handleGame1Response('left');
+        }
+    }, { passive: false });
+
+    rightBuzzer.addEventListener('touchstart', (e) => {
+        if (!rightBuzzer.disabled) {
+            e.preventDefault();
+            handleGame1Response('right');
+        }
+    }, { passive: false });
 
     // Keyboard support for Game 1
     document.addEventListener('keydown', (e) => {
@@ -458,22 +560,30 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('game2-start').addEventListener('click', startGame2);
     document.getElementById('game2-stop').addEventListener('click', stopGame2);
 
-    document.getElementById('caught-btn').addEventListener('click', () => {
-        handleGame2Response(true);
+    // Catch zone interactions (support both click and touch)
+    const catchZone = document.getElementById('catch-zone');
+
+    catchZone.addEventListener('click', () => {
+        if (!catchZone.disabled) {
+            handleGame2Response();
+        }
     });
 
-    document.getElementById('missed-btn').addEventListener('click', () => {
-        handleGame2Response(false);
-    });
+    // Touch support for mobile
+    catchZone.addEventListener('touchstart', (e) => {
+        if (!catchZone.disabled) {
+            e.preventDefault();
+            handleGame2Response();
+        }
+    }, { passive: false });
 
-    // Keyboard support for Game 2
+    // Keyboard support for Game 2 (spacebar to continue)
     document.addEventListener('keydown', (e) => {
         if (!game2.isActive || !game2.isDropCallout) return;
 
-        if (e.key === 'c' || e.key === 'C' || e.key === ' ') {
-            handleGame2Response(true);
-        } else if (e.key === 'm' || e.key === 'M' || e.key === 'x' || e.key === 'X') {
-            handleGame2Response(false);
+        if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault();
+            handleGame2Response();
         }
     });
 
