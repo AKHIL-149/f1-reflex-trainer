@@ -955,3 +955,394 @@ header h1 {
         font-size: 1.5em;
     }
 }
+
+/* Game 3: Random Screen Tap */
+.game-options {
+    background: #1a1a1a;
+    padding: 25px;
+    border-radius: 10px;
+    margin-bottom: 25px;
+    border: 2px solid #e10600;
+}
+
+.option-section {
+    margin-bottom: 20px;
+}
+
+.option-section:last-child {
+    margin-bottom: 0;
+}
+
+.option-section h3 {
+    color: #e10600;
+    font-size: 1.2em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.color-selection {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    padding: 10px;
+}
+
+.color-option {
+    width: 70px;
+    height: 70px;
+    border-radius: 10px;
+    border: 3px solid #444;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+
+.color-option:hover {
+    transform: scale(1.1);
+    border-color: #888;
+    box-shadow: 0 5px 15px rgba(255, 255, 255, 0.2);
+}
+
+.color-option.selected {
+    border-color: #00ff00;
+    border-width: 4px;
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+    transform: scale(1.15);
+}
+
+.color-option.selected::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 2em;
+    font-weight: bold;
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.8), 0 0 10px rgba(0, 0, 0, 0.8);
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: #2a2a2a;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.toggle-label:hover {
+    background: #333;
+}
+
+.toggle-checkbox {
+    width: 50px;
+    height: 26px;
+    appearance: none;
+    background: #555;
+    border-radius: 13px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    flex-shrink: 0;
+}
+
+.toggle-checkbox:checked {
+    background: #e10600;
+}
+
+.toggle-checkbox::before {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    top: 3px;
+    left: 3px;
+    transition: left 0.3s ease;
+}
+
+.toggle-checkbox:checked::before {
+    left: 27px;
+}
+
+.toggle-text {
+    color: #ddd;
+    font-size: 1em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.target-colors-container {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.target-color-box {
+    width: 80px;
+    height: 80px;
+    border-radius: 10px;
+    border: 3px solid white;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+}
+
+.target-change-notification {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.9);
+    padding: 40px 60px;
+    border-radius: 15px;
+    border: 3px solid #e10600;
+    z-index: 100;
+    font-size: 2.5em;
+    font-weight: bold;
+    color: #e10600;
+    text-align: center;
+    box-shadow: 0 0 40px rgba(225, 6, 0, 0.6);
+    animation: fadeInOut 2s ease-in-out;
+}
+
+@keyframes fadeInOut {
+    0%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+    20%, 80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+.tap-zone {
+    position: relative;
+    width: 100%;
+    min-height: 400px;
+    background: #1a1a1a;
+    border-radius: 15px;
+    margin-bottom: 30px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s ease;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    border: 3px solid #444;
+}
+
+.tap-zone[data-enabled="true"] {
+    border-color: #e10600;
+    box-shadow: 0 0 20px rgba(225, 6, 0, 0.3);
+}
+
+.countdown-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8em;
+    font-weight: bold;
+    color: white;
+    text-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+    z-index: 10;
+    pointer-events: none;
+}
+
+.tap-instruction {
+    font-size: 2em;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: #888;
+    letter-spacing: 2px;
+    text-align: center;
+    padding: 20px;
+    pointer-events: none;
+}
+
+.target-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 20px;
+    padding: 20px;
+    background: #1a1a1a;
+    border-radius: 10px;
+    border: 2px solid #e10600;
+}
+
+.target-label {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #e10600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.target-color-box {
+    width: 80px;
+    height: 80px;
+    border-radius: 10px;
+    border: 3px solid white;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+}
+
+.results-panel {
+    background: #1a1a1a;
+    padding: 30px;
+    border-radius: 15px;
+    border: 2px solid #e10600;
+    margin-top: 30px;
+}
+
+.results-panel h3 {
+    color: #e10600;
+    font-size: 2em;
+    text-align: center;
+    text-transform: uppercase;
+    margin-bottom: 25px;
+    letter-spacing: 2px;
+}
+
+.results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.result-item {
+    background: #2a2a2a;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid #444;
+}
+
+.result-label {
+    display: block;
+    color: #888;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+
+.result-value {
+    display: block;
+    color: #ffffff;
+    font-size: 1.6em;
+    font-weight: bold;
+}
+
+.performance-rating {
+    text-align: center;
+    font-size: 1.8em;
+    font-weight: bold;
+    padding: 20px;
+    border-radius: 10px;
+    margin-top: 20px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.performance-rating.excellent {
+    background: linear-gradient(135deg, #00cc66 0%, #009944 100%);
+    color: white;
+}
+
+.performance-rating.good {
+    background: linear-gradient(135deg, #ff9900 0%, #cc7700 100%);
+    color: white;
+}
+
+.performance-rating.needs-improvement {
+    background: linear-gradient(135deg, #cc0000 0%, #990000 100%);
+    color: white;
+}
+
+/* Mobile responsiveness for Game 3 */
+@media (max-width: 768px) {
+    .game-options {
+        padding: 15px;
+    }
+
+    .option-section h3 {
+        font-size: 1em;
+    }
+
+    .color-option {
+        width: 55px;
+        height: 55px;
+    }
+
+    .toggle-label {
+        padding: 10px;
+    }
+
+    .toggle-text {
+        font-size: 0.85em;
+    }
+
+    .target-change-notification {
+        padding: 25px 35px;
+        font-size: 1.8em;
+    }
+
+    .tap-zone {
+        min-height: 300px;
+    }
+
+    .countdown-overlay {
+        font-size: 5em;
+    }
+
+    .tap-instruction {
+        font-size: 1.3em;
+        padding: 15px;
+    }
+
+    .target-indicator {
+        flex-direction: column;
+        gap: 10px;
+        padding: 15px;
+    }
+
+    .target-label {
+        font-size: 1.2em;
+    }
+
+    .target-color-box {
+        width: 60px;
+        height: 60px;
+    }
+
+    .results-panel {
+        padding: 20px;
+    }
+
+    .results-panel h3 {
+        font-size: 1.5em;
+    }
+
+    .results-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .performance-rating {
+        font-size: 1.3em;
+        padding: 15px;
+    }
+}

@@ -462,6 +462,680 @@ function updateGame2Stats() {
 }
 
 // ===========================
+// GAME 3: RANDOM SCREEN TAP
+// ===========================
+
+// Color pools for different difficulty levels
+const COLOR_POOLS = {
+    easy: [
+        { name: 'red', value: '#FF0000' },
+        { name: 'green', value: '#00FF00' },
+        { name: 'blue', value: '#0000FF' },
+        { name: 'yellow', value: '#FFFF00' },
+        { name: 'purple', value: '#FF00FF' }
+    ],
+    medium: [
+        { name: 'red', value: '#FF0000' },
+        { name: 'orange', value: '#FF8800' },
+        { name: 'yellow', value: '#FFFF00' },
+        { name: 'green', value: '#00FF00' },
+        { name: 'cyan', value: '#00FFFF' },
+        { name: 'blue', value: '#0000FF' },
+        { name: 'purple', value: '#FF00FF' },
+        { name: 'pink', value: '#FF66FF' }
+    ],
+    hard: [
+        { name: 'red', value: '#FF0000' },
+        { name: 'crimson', value: '#DC143C' },
+        { name: 'orange', value: '#FF8800' },
+        { name: 'amber', value: '#FFBF00' },
+        { name: 'yellow', value: '#FFFF00' },
+        { name: 'lime', value: '#00FF00' },
+        { name: 'green', value: '#008000' },
+        { name: 'cyan', value: '#00FFFF' },
+        { name: 'blue', value: '#0000FF' },
+        { name: 'navy', value: '#000080' },
+        { name: 'purple', value: '#800080' },
+        { name: 'magenta', value: '#FF00FF' }
+    ]
+};
+
+// Game 3 difficulty settings
+const GAME3_SETTINGS = {
+    easy: {
+        minDelay: 2500,
+        maxDelay: 5000,
+        reactionWindow: 1500,
+        totalRounds: 20,
+        targetFrequency: 0.4,
+        targetFrequencyVariance: 0.1,
+        burstProbability: 0.05,
+        pointsCorrect: 100,
+        pointsWrong: -30,
+        pointsMissed: -50,
+        streakBonus: 20
+    },
+    medium: {
+        minDelay: 1500,
+        maxDelay: 4000,
+        reactionWindow: 1200,
+        totalRounds: 30,
+        targetFrequency: 0.35,
+        targetFrequencyVariance: 0.15,
+        burstProbability: 0.1,
+        pointsCorrect: 150,
+        pointsWrong: -50,
+        pointsMissed: -75,
+        streakBonus: 30
+    },
+    hard: {
+        minDelay: 500,
+        maxDelay: 2500,
+        reactionWindow: 1000,
+        totalRounds: 40,
+        targetFrequency: 0.3,
+        targetFrequencyVariance: 0.2,
+        burstProbability: 0.15,
+        pointsCorrect: 200,
+        pointsWrong: -75,
+        pointsMissed: -100,
+        streakBonus: 50
+    }
+};
+
+const game3 = {
+    isActive: false,
+    isPaused: false,
+    currentColor: null,
+    targetColors: [],
+    selectedColors: [],
+    colorPool: [],
+    settings: null,
+    timeoutId: null,
+    currentRound: 0,
+    isTargetShowing: false,
+    roundStartTime: null,
+    consecutiveFalseTaps: 0,
+    consecutiveNonTargets: 0,
+    lastTargetColors: [],
+    multiTargetMode: false,
+    dynamicRotation: true,
+    rotationInterval: 5,
+    isBurstMode: false,
+    stats: {
+        targetAppearances: 0,
+        correctTaps: 0,
+        falseTaps: 0,
+        missedTargets: 0,
+        reactionTimes: [],
+        score: 0,
+        currentStreak: 0,
+        bestStreak: 0,
+        targetChanges: 0
+    }
+};
+
+function initializeGame3Colors() {
+    const colorSelection = document.getElementById('color-selection');
+    colorSelection.innerHTML = '';
+
+    const colors = COLOR_POOLS[currentDifficulty];
+
+    colors.forEach(color => {
+        const colorBtn = document.createElement('div');
+        colorBtn.className = 'color-option';
+        colorBtn.style.backgroundColor = color.value;
+        colorBtn.dataset.colorName = color.name;
+        colorBtn.dataset.colorValue = color.value;
+
+        colorBtn.addEventListener('click', () => {
+            handleColorSelection(colorBtn, color);
+        });
+
+        colorSelection.appendChild(colorBtn);
+    });
+}
+
+function handleColorSelection(colorBtn, color) {
+    const multiTargetMode = document.getElementById('multi-target-mode').checked;
+    // Limit to 2-3 colors in multi-target for better gameplay
+    const maxSelection = multiTargetMode ? 3 : 1;
+
+    if (colorBtn.classList.contains('selected')) {
+        // Deselect
+        colorBtn.classList.remove('selected');
+        game3.selectedColors = game3.selectedColors.filter(c => c.name !== color.name);
+    } else {
+        // Select
+        if (game3.selectedColors.length >= maxSelection) {
+            // In multi-target mode, show warning and don't allow more
+            if (multiTargetMode) {
+                updateGame3Status(`Maximum ${maxSelection} colors allowed in Multi-Target Mode!`);
+                speak('Maximum colors selected');
+                playBeep(300, 200);
+                return;
+            } else {
+                // Remove previous selection in single target mode
+                document.querySelectorAll('.color-option.selected').forEach(btn => {
+                    btn.classList.remove('selected');
+                });
+                game3.selectedColors = [];
+            }
+        }
+        colorBtn.classList.add('selected');
+        game3.selectedColors.push(color);
+
+        // Update status
+        if (multiTargetMode && game3.selectedColors.length >= 2) {
+            updateGame3Status(`${game3.selectedColors.length} colors selected. Click Start when ready!`);
+        }
+    }
+
+    updateTargetDisplay();
+}
+
+function updateTargetDisplay() {
+    const container = document.getElementById('target-colors-container');
+    container.innerHTML = '';
+
+    game3.selectedColors.forEach(color => {
+        const box = document.createElement('div');
+        box.className = 'target-color-box';
+        box.style.backgroundColor = color.value;
+        container.appendChild(box);
+    });
+}
+
+function selectRandomTargets() {
+    const multiTargetMode = game3.multiTargetMode;
+    const count = multiTargetMode ? (2 + Math.floor(Math.random() * 2)) : 1; // 2-3 targets in multi mode
+
+    // Clear current targets
+    game3.targetColors = [];
+
+    // Select random colors from pool
+    const availableColors = [...game3.colorPool];
+    for (let i = 0; i < count && availableColors.length > 0; i++) {
+        const randomIndex = Math.floor(Math.random() * availableColors.length);
+        game3.targetColors.push(availableColors[randomIndex]);
+        availableColors.splice(randomIndex, 1);
+    }
+
+    // Update display
+    const container = document.getElementById('target-colors-container');
+    container.innerHTML = '';
+    game3.targetColors.forEach(color => {
+        const box = document.createElement('div');
+        box.className = 'target-color-box';
+        box.style.backgroundColor = color.value;
+        container.appendChild(box);
+    });
+
+    return game3.targetColors;
+}
+
+function showTargetChangeNotification(newTargets) {
+    const notification = document.createElement('div');
+    notification.className = 'target-change-notification';
+
+    const targetNames = newTargets.map(t => t.name.toUpperCase()).join(', ');
+    notification.innerHTML = `NEW TARGET!<br>${targetNames}`;
+
+    document.body.appendChild(notification);
+
+    const colorNames = newTargets.map(t => t.name).join(' and ');
+    speak(`New target: ${colorNames}`);
+    playBeep(600, 300);
+
+    setTimeout(() => {
+        notification.remove();
+    }, 2000);
+}
+
+function startGame3() {
+    if (game3.isActive) return;
+
+    // Check if colors are selected
+    if (game3.selectedColors.length === 0) {
+        updateGame3Status('Please select at least one target color!');
+        speak('Please select a target color');
+        return;
+    }
+
+    // Get settings
+    game3.multiTargetMode = document.getElementById('multi-target-mode').checked;
+    game3.dynamicRotation = document.getElementById('dynamic-rotation').checked;
+
+    // Reset state
+    game3.stats = {
+        targetAppearances: 0,
+        correctTaps: 0,
+        falseTaps: 0,
+        missedTargets: 0,
+        reactionTimes: [],
+        score: 0,
+        currentStreak: 0,
+        bestStreak: 0,
+        targetChanges: 0
+    };
+    game3.currentRound = 0;
+    game3.consecutiveFalseTaps = 0;
+    game3.isTargetShowing = false;
+
+    // Get difficulty settings and adjust for multi-target mode
+    game3.settings = { ...GAME3_SETTINGS[currentDifficulty] };
+    game3.colorPool = [...COLOR_POOLS[currentDifficulty]];
+
+    // Extend rounds for multi-target mode (more colors = more rounds needed)
+    if (game3.multiTargetMode) {
+        const targetCount = game3.selectedColors.length;
+        const roundMultiplier = 1 + (targetCount - 1) * 0.2; // 20% more rounds per additional color
+        game3.settings.totalRounds = Math.ceil(game3.settings.totalRounds * roundMultiplier);
+    }
+
+    // Set initial target colors
+    if (game3.multiTargetMode || game3.dynamicRotation) {
+        selectRandomTargets();
+    } else {
+        game3.targetColors = [...game3.selectedColors];
+        updateTargetDisplay();
+    }
+
+    // Reset tracking
+    game3.consecutiveNonTargets = 0;
+    game3.lastTargetColors = [];
+    game3.isBurstMode = false;
+
+    // Update UI
+    updateGame3Stats();
+    document.getElementById('results-panel').style.display = 'none';
+    document.getElementById('game3-options').style.display = 'none';
+    document.getElementById('game3-start').disabled = true;
+    document.getElementById('game3-stop').disabled = false;
+
+    // Show countdown
+    showCountdown(() => {
+        game3.isActive = true;
+        document.getElementById('tap-zone').setAttribute('data-enabled', 'true');
+
+        const targetInfo = game3.targetColors.length > 1 ?
+            'target colors' : 'target color';
+        speak(`Game 3 starting. Tap only on the ${targetInfo}`);
+        updateGame3Status('Watch carefully...');
+        nextGame3Round();
+    });
+}
+
+function stopGame3() {
+    game3.isActive = false;
+    if (game3.timeoutId) {
+        clearTimeout(game3.timeoutId);
+    }
+
+    document.getElementById('game3-start').disabled = false;
+    document.getElementById('game3-stop').disabled = true;
+    document.getElementById('tap-zone').setAttribute('data-enabled', 'false');
+    document.getElementById('tap-zone').style.backgroundColor = '#1a1a1a';
+    document.getElementById('game3-options').style.display = 'block';
+
+    speak('Game 3 stopped');
+    updateGame3Status('Select your target color(s) above and click Start');
+}
+
+function showCountdown(callback) {
+    const overlay = document.getElementById('countdown-overlay');
+    const counts = ['3', '2', '1', 'GO!'];
+    let index = 0;
+
+    function showNext() {
+        if (index < counts.length) {
+            overlay.textContent = counts[index];
+            speak(counts[index] === 'GO!' ? 'Go' : counts[index]);
+            playBeep(400 + (index * 100), 200);
+            index++;
+            setTimeout(showNext, 800);
+        } else {
+            overlay.textContent = '';
+            callback();
+        }
+    }
+
+    showNext();
+}
+
+function nextGame3Round() {
+    if (!game3.isActive) return;
+
+    game3.currentRound++;
+
+    // Check if game is complete
+    if (game3.currentRound > game3.settings.totalRounds) {
+        endGame3();
+        return;
+    }
+
+    // Dynamic rotation: Change target every 5 rounds
+    if (game3.dynamicRotation && game3.currentRound > 1 && (game3.currentRound - 1) % game3.rotationInterval === 0) {
+        const newTargets = selectRandomTargets();
+        game3.stats.targetChanges++;
+        showTargetChangeNotification(newTargets);
+
+        // Delay before continuing to next round
+        setTimeout(() => {
+            if (game3.isActive) {
+                continueToNextRound();
+            }
+        }, 2500);
+        return;
+    }
+
+    continueToNextRound();
+}
+
+function continueToNextRound() {
+    if (!game3.isActive) return;
+
+    updateGame3Stats();
+    game3.isTargetShowing = false;
+
+    // Reset tap zone
+    document.getElementById('tap-zone').style.backgroundColor = '#1a1a1a';
+
+    // Check for burst mode (occasional rapid-fire targets)
+    if (!game3.isBurstMode && Math.random() < game3.settings.burstProbability) {
+        game3.isBurstMode = true;
+        speak('Burst mode');
+        playBeep(700, 100);
+    }
+
+    // Calculate dynamic delay (shorter in burst mode, but not too extreme)
+    let minDelay = game3.settings.minDelay;
+    let maxDelay = game3.settings.maxDelay;
+
+    if (game3.isBurstMode) {
+        // Reduce by 30% instead of 60% - more reasonable
+        minDelay = Math.max(700, minDelay * 0.7);  // Hard minimum: 700ms
+        maxDelay = Math.max(1500, maxDelay * 0.7); // Hard maximum: 1500ms minimum
+    }
+
+    const delay = Math.random() * (maxDelay - minDelay) + minDelay;
+
+    game3.timeoutId = setTimeout(() => {
+        if (!game3.isActive) return;
+
+        // Calculate dynamic target frequency
+        let baseFrequency = game3.settings.targetFrequency;
+
+        // Increase frequency for multi-target mode
+        if (game3.multiTargetMode) {
+            baseFrequency += 0.2; // Boost from 30% to 50% for example
+        }
+
+        // Add variance to prevent predictability
+        const variance = game3.settings.targetFrequencyVariance;
+        const dynamicFrequency = baseFrequency + (Math.random() * variance * 2 - variance);
+
+        // Anti-pattern logic: Force a target if too many consecutive non-targets
+        const maxConsecutiveNonTargets = game3.multiTargetMode ? 3 : 4;
+        let showTarget;
+
+        if (game3.consecutiveNonTargets >= maxConsecutiveNonTargets) {
+            showTarget = true; // Force target to break pattern
+        } else if (game3.isBurstMode) {
+            showTarget = Math.random() < 0.7; // Higher chance in burst mode
+        } else {
+            showTarget = Math.random() < dynamicFrequency;
+        }
+
+        if (showTarget) {
+            // Select target color - ensure variety in multi-target mode
+            let selectedTarget;
+
+            if (game3.multiTargetMode && game3.lastTargetColors.length > 0) {
+                // Try to select a different target than last time
+                const availableTargets = game3.targetColors.filter(
+                    t => !game3.lastTargetColors.includes(t.name)
+                );
+
+                if (availableTargets.length > 0) {
+                    selectedTarget = availableTargets[Math.floor(Math.random() * availableTargets.length)];
+                } else {
+                    selectedTarget = game3.targetColors[Math.floor(Math.random() * game3.targetColors.length)];
+                }
+            } else {
+                selectedTarget = game3.targetColors[Math.floor(Math.random() * game3.targetColors.length)];
+            }
+
+            game3.currentColor = selectedTarget;
+            game3.isTargetShowing = true;
+            game3.stats.targetAppearances++;
+            game3.consecutiveNonTargets = 0;
+
+            // Track last target color
+            game3.lastTargetColors = [selectedTarget.name];
+            if (game3.lastTargetColors.length > 2) {
+                game3.lastTargetColors.shift();
+            }
+        } else {
+            // Select random non-target color
+            const targetNames = game3.targetColors.map(t => t.name);
+            const availableColors = game3.colorPool.filter(c => !targetNames.includes(c.name));
+            game3.currentColor = availableColors[Math.floor(Math.random() * availableColors.length)];
+            game3.isTargetShowing = false;
+            game3.consecutiveNonTargets++;
+        }
+
+        // End burst mode randomly
+        if (game3.isBurstMode && Math.random() < 0.3) {
+            game3.isBurstMode = false;
+        }
+
+        // Show color
+        document.getElementById('tap-zone').style.backgroundColor = game3.currentColor.value;
+        game3.roundStartTime = Date.now();
+
+        if (game3.isTargetShowing) {
+            updateGame3Status('TARGET! Tap now!');
+            playBeep(800, 150);
+        } else {
+            updateGame3Status('Not the target... wait');
+        }
+
+        // Set timeout for missed target or move to next round
+        game3.timeoutId = setTimeout(() => {
+            if (!game3.isActive) return;
+
+            if (game3.isTargetShowing) {
+                // Missed target
+                handleGame3Missed();
+            } else {
+                // Correct non-tap
+                nextGame3Round();
+            }
+        }, game3.settings.reactionWindow);
+    }, delay);
+}
+
+function handleGame3Tap() {
+    if (!game3.isActive) return;
+
+    clearTimeout(game3.timeoutId);
+
+    if (game3.isTargetShowing) {
+        // Correct tap on target
+        const reactionTime = Date.now() - game3.roundStartTime;
+        game3.stats.reactionTimes.push(reactionTime);
+        game3.stats.correctTaps++;
+        game3.stats.currentStreak++;
+        game3.consecutiveFalseTaps = 0;
+
+        if (game3.stats.currentStreak > game3.stats.bestStreak) {
+            game3.stats.bestStreak = game3.stats.currentStreak;
+        }
+
+        // Calculate points with speed bonus
+        let points = game3.settings.pointsCorrect;
+        const speedBonus = Math.max(0, Math.floor((game3.settings.reactionWindow - reactionTime) / 10));
+        points += speedBonus;
+
+        // Streak bonus
+        if (game3.stats.currentStreak >= 3) {
+            points += game3.settings.streakBonus * Math.floor(game3.stats.currentStreak / 3);
+        }
+
+        game3.stats.score += points;
+
+        playBeep(1000, 200);
+        speak('Correct');
+        updateGame3Status(`Correct! +${points} points (${reactionTime}ms)`);
+        flashCard('game3', 'correct');
+    } else {
+        // False tap on wrong color
+        game3.stats.falseTaps++;
+        game3.stats.currentStreak = 0;
+        game3.consecutiveFalseTaps++;
+
+        let penalty = game3.settings.pointsWrong;
+
+        // Extra penalty for multiple consecutive false taps
+        if (game3.consecutiveFalseTaps > 2) {
+            penalty *= 1.5;
+        }
+
+        game3.stats.score += penalty;
+
+        playBeep(200, 400);
+        speak('Wrong');
+        updateGame3Status(`Wrong color! ${penalty} points`);
+        flashCard('game3', 'wrong');
+    }
+
+    updateGame3Stats();
+
+    // Next round after brief delay
+    setTimeout(() => {
+        if (game3.isActive) {
+            nextGame3Round();
+        }
+    }, 800);
+}
+
+function handleGame3Missed() {
+    if (!game3.isActive) return;
+
+    game3.stats.missedTargets++;
+    game3.stats.currentStreak = 0;
+    game3.stats.score += game3.settings.pointsMissed;
+
+    playBeep(150, 600);
+    speak('Missed');
+    updateGame3Status(`Missed target! ${game3.settings.pointsMissed} points`);
+    flashCard('game3', 'missed');
+
+    updateGame3Stats();
+
+    setTimeout(() => {
+        if (game3.isActive) {
+            nextGame3Round();
+        }
+    }, 800);
+}
+
+function endGame3() {
+    game3.isActive = false;
+    document.getElementById('tap-zone').setAttribute('data-enabled', 'false');
+    document.getElementById('tap-zone').style.backgroundColor = '#1a1a1a';
+    document.getElementById('game3-stop').disabled = true;
+
+    // Show results
+    displayGame3Results();
+    speak('Session complete');
+}
+
+function displayGame3Results() {
+    const resultsPanel = document.getElementById('results-panel');
+    resultsPanel.style.display = 'block';
+
+    // Populate results
+    document.getElementById('result-rounds').textContent = game3.settings.totalRounds;
+    document.getElementById('result-targets').textContent = game3.stats.targetAppearances;
+    document.getElementById('result-successful').textContent = game3.stats.correctTaps;
+    document.getElementById('result-false-taps').textContent = game3.stats.falseTaps;
+    document.getElementById('result-missed').textContent = game3.stats.missedTargets;
+    document.getElementById('result-final-score').textContent = game3.stats.score;
+
+    if (game3.stats.reactionTimes.length > 0) {
+        const avgTime = Math.round(
+            game3.stats.reactionTimes.reduce((a, b) => a + b, 0) / game3.stats.reactionTimes.length
+        );
+        const bestTime = Math.min(...game3.stats.reactionTimes);
+        document.getElementById('result-avg-time').textContent = `${avgTime}ms`;
+        document.getElementById('result-best-time').textContent = `${bestTime}ms`;
+    } else {
+        document.getElementById('result-avg-time').textContent = '-';
+        document.getElementById('result-best-time').textContent = '-';
+    }
+
+    // Calculate accuracy
+    const totalAttempts = game3.stats.correctTaps + game3.stats.falseTaps + game3.stats.missedTargets;
+    const accuracy = totalAttempts > 0 ? (game3.stats.correctTaps / totalAttempts) * 100 : 0;
+
+    // Determine performance rating
+    const ratingElement = document.getElementById('performance-rating');
+    let ratingClass, ratingText;
+
+    if (accuracy >= 80 && game3.stats.score > game3.settings.totalRounds * 100) {
+        ratingClass = 'excellent';
+        ratingText = 'Performance: Excellent';
+    } else if (accuracy >= 60 && game3.stats.score > 0) {
+        ratingClass = 'good';
+        ratingText = 'Performance: Good';
+    } else {
+        ratingClass = 'needs-improvement';
+        ratingText = 'Performance: Needs Improvement';
+    }
+
+    // Add dynamic rotation info if enabled
+    if (game3.dynamicRotation && game3.stats.targetChanges > 0) {
+        ratingText += ` • ${game3.stats.targetChanges} Target Changes`;
+    }
+
+    // Add multi-target info if enabled
+    if (game3.multiTargetMode) {
+        ratingText += ' • Multi-Target Mode';
+    }
+
+    ratingElement.textContent = ratingText;
+    ratingElement.className = `performance-rating ${ratingClass}`;
+}
+
+function updateGame3Status(message) {
+    document.querySelector('#game3-status .status-message').textContent = message;
+}
+
+function updateGame3Stats() {
+    document.getElementById('game3-round').textContent = `${game3.currentRound}/${game3.settings?.totalRounds || 0}`;
+    document.getElementById('game3-score').textContent = game3.stats.score;
+    document.getElementById('game3-streak').textContent = game3.stats.currentStreak;
+    document.getElementById('game3-correct').textContent = game3.stats.correctTaps;
+    document.getElementById('game3-false').textContent = game3.stats.falseTaps;
+    document.getElementById('game3-missed').textContent = game3.stats.missedTargets;
+
+    const totalAttempts = game3.stats.correctTaps + game3.stats.falseTaps + game3.stats.missedTargets;
+    const accuracy = totalAttempts > 0 ? ((game3.stats.correctTaps / totalAttempts) * 100).toFixed(1) : 0;
+    document.getElementById('game3-accuracy').textContent = `${accuracy}%`;
+
+    if (game3.stats.reactionTimes.length > 0) {
+        const avgTime = Math.round(
+            game3.stats.reactionTimes.reduce((a, b) => a + b, 0) / game3.stats.reactionTimes.length
+        );
+        document.getElementById('game3-avg-time').textContent = `${avgTime}ms`;
+    } else {
+        document.getElementById('game3-avg-time').textContent = '0ms';
+    }
+}
+
+// ===========================
 // UTILITY FUNCTIONS
 // ===========================
 
@@ -487,6 +1161,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (game2.isActive) {
                 stopGame2();
+            }
+            if (game3.isActive) {
+                stopGame3();
             }
 
             // Update active button
@@ -584,6 +1261,70 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === ' ' || e.key === 'Enter') {
             e.preventDefault();
             handleGame2Response();
+        }
+    });
+
+    // Game 3 controls
+    document.getElementById('game3-start').addEventListener('click', startGame3);
+    document.getElementById('game3-stop').addEventListener('click', stopGame3);
+
+    // Initialize Game 3 colors
+    initializeGame3Colors();
+
+    // Multi-target mode toggle
+    document.getElementById('multi-target-mode').addEventListener('change', (e) => {
+        const isMulti = e.target.checked;
+
+        // Clear current selections if switching from multi to single with multiple selected
+        if (!isMulti && game3.selectedColors.length > 1) {
+            game3.selectedColors = [];
+            document.querySelectorAll('.color-option.selected').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            updateTargetDisplay();
+        }
+
+        speak(isMulti ? 'Multi target mode enabled' : 'Single target mode');
+        playBeep(500, 150);
+    });
+
+    // Dynamic rotation toggle
+    document.getElementById('dynamic-rotation').addEventListener('change', (e) => {
+        speak(e.target.checked ? 'Dynamic rotation enabled' : 'Dynamic rotation disabled');
+        playBeep(500, 150);
+    });
+
+    // Update colors when difficulty changes
+    document.getElementById('difficulty-select').addEventListener('change', () => {
+        if (document.getElementById('game3').classList.contains('active')) {
+            game3.selectedColors = [];
+            initializeGame3Colors();
+            updateTargetDisplay();
+        }
+    });
+
+    // Tap zone interactions
+    const tapZone = document.getElementById('tap-zone');
+
+    tapZone.addEventListener('click', () => {
+        if (game3.isActive && tapZone.getAttribute('data-enabled') === 'true') {
+            handleGame3Tap();
+        }
+    });
+
+    tapZone.addEventListener('touchstart', (e) => {
+        if (game3.isActive && tapZone.getAttribute('data-enabled') === 'true') {
+            e.preventDefault();
+            handleGame3Tap();
+        }
+    }, { passive: false });
+
+    // Keyboard support for Game 3 (spacebar to tap)
+    document.addEventListener('keydown', (e) => {
+        if (!game3.isActive) return;
+        if (e.key === ' ' && tapZone.getAttribute('data-enabled') === 'true') {
+            e.preventDefault();
+            handleGame3Tap();
         }
     });
 

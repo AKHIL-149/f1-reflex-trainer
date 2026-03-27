@@ -24,6 +24,10 @@
                     <span class="game-icon">⚡</span>
                     <span class="game-title">Ball Drop Catch</span>
                 </button>
+                <button class="game-menu-btn" data-game="game3">
+                    <span class="game-icon">🎨</span>
+                    <span class="game-title">Random Screen Tap</span>
+                </button>
             </div>
             <div class="difficulty-selector">
                 <label for="difficulty-select">Difficulty:</label>
@@ -142,6 +146,123 @@
                         <span class="stat-label">Rounds Completed:</span>
                         <span class="stat-value" id="game2-rounds">0</span>
                     </div>
+                </div>
+            </div>
+
+            <!-- Game 3: Random Screen Tap -->
+            <div class="game-card" id="game3">
+                <div class="game-header">
+                    <h2>Game 3: Random Screen Tap</h2>
+                    <p>Tap the screen only when the target color appears!</p>
+                </div>
+
+                <div class="game-options" id="game3-options">
+                    <div class="option-section">
+                        <h3>Select Target Color(s)</h3>
+                        <div class="color-selection" id="color-selection"></div>
+                    </div>
+                    <div class="option-section">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="multi-target-mode" class="toggle-checkbox">
+                            <span class="toggle-text">Multi-Target Mode (Track 2-3 colors)</span>
+                        </label>
+                        <label class="toggle-label">
+                            <input type="checkbox" id="dynamic-rotation" class="toggle-checkbox" checked>
+                            <span class="toggle-text">Dynamic Rotation (New target every 5 rounds)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="game-status" id="game3-status">
+                    <div class="status-message">Select your target color(s) above and click Start</div>
+                    <div class="target-indicator" id="target-indicator">
+                        <span class="target-label">Target Color(s):</span>
+                        <div class="target-colors-container" id="target-colors-container"></div>
+                    </div>
+                </div>
+
+                <div class="tap-zone" id="tap-zone" data-enabled="false">
+                    <div class="countdown-overlay" id="countdown-overlay"></div>
+                    <div class="tap-instruction">TAP ONLY ON TARGET COLOR</div>
+                </div>
+
+                <div class="game-controls">
+                    <button class="control-btn start-btn" id="game3-start">Start Training</button>
+                    <button class="control-btn stop-btn" id="game3-stop" disabled>Stop</button>
+                </div>
+
+                <div class="stats" id="game3-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Round:</span>
+                        <span class="stat-value" id="game3-round">0/0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Score:</span>
+                        <span class="stat-value" id="game3-score">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Streak:</span>
+                        <span class="stat-value" id="game3-streak">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Correct:</span>
+                        <span class="stat-value correct" id="game3-correct">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">False Taps:</span>
+                        <span class="stat-value wrong" id="game3-false">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Missed:</span>
+                        <span class="stat-value missed" id="game3-missed">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Accuracy:</span>
+                        <span class="stat-value" id="game3-accuracy">0%</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Avg Time:</span>
+                        <span class="stat-value" id="game3-avg-time">0ms</span>
+                    </div>
+                </div>
+
+                <div class="results-panel" id="results-panel" style="display: none;">
+                    <h3>Session Complete!</h3>
+                    <div class="results-grid">
+                        <div class="result-item">
+                            <span class="result-label">Total Rounds:</span>
+                            <span class="result-value" id="result-rounds">0</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Target Appearances:</span>
+                            <span class="result-value" id="result-targets">0</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Successful Taps:</span>
+                            <span class="result-value" id="result-successful">0</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">False Taps:</span>
+                            <span class="result-value" id="result-false-taps">0</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Missed Reactions:</span>
+                            <span class="result-value" id="result-missed">0</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Best Reaction:</span>
+                            <span class="result-value" id="result-best-time">-</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Average Time:</span>
+                            <span class="result-value" id="result-avg-time">-</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Final Score:</span>
+                            <span class="result-value" id="result-final-score">0</span>
+                        </div>
+                    </div>
+                    <div class="performance-rating" id="performance-rating"></div>
                 </div>
             </div>
         </div>
