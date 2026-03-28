@@ -28,6 +28,10 @@
                     <span class="game-icon">🎨</span>
                     <span class="game-title">Random Screen Tap</span>
                 </button>
+                <button class="game-menu-btn" data-game="game4">
+                    <span class="game-icon">👁️</span>
+                    <span class="game-title">Peripheral Vision</span>
+                </button>
             </div>
             <div class="difficulty-selector">
                 <label for="difficulty-select">Difficulty:</label>
@@ -45,6 +49,7 @@
                 <div class="game-header">
                     <h2>Game 1: Left/Right Buzzer</h2>
                     <p>Press the correct buzzer when called</p>
+                    <button class="guide-btn" data-guide="game1">❓ How to Play</button>
                 </div>
 
                 <div class="game-status" id="game1-status">
@@ -99,6 +104,7 @@
                 <div class="game-header">
                     <h2>Game 2: Ball Drop Catch</h2>
                     <p>Drop and catch with the specified hand - left, right, or both!</p>
+                    <button class="guide-btn" data-guide="game2">❓ How to Play</button>
                 </div>
 
                 <div class="time-settings">
@@ -154,6 +160,7 @@
                 <div class="game-header">
                     <h2>Game 3: Random Screen Tap</h2>
                     <p>Tap the screen only when the target color appears!</p>
+                    <button class="guide-btn" data-guide="game3">❓ How to Play</button>
                 </div>
 
                 <div class="game-options" id="game3-options">
@@ -264,6 +271,172 @@
                     </div>
                     <div class="performance-rating" id="performance-rating"></div>
                 </div>
+            </div>
+
+            <!-- Game 4: Peripheral Number Recognition -->
+            <div class="game-card" id="game4">
+                <div class="game-header">
+                    <h2>Game 4: Peripheral Number Recognition</h2>
+                    <p>Keep your eyes on the center. Identify numbers in your peripheral vision!</p>
+                    <button class="guide-btn" data-guide="game4">❓ How to Play</button>
+                </div>
+
+                <div class="game-instructions" id="game4-instructions">
+                    <p>⚠️ <strong>Important:</strong> Do NOT move your eyes from the center point!</p>
+                    <p>Numbers will flash briefly around the center. Use your peripheral vision to identify them.</p>
+                    <p><em>Easy: Left/Right only • Medium/Hard: All 4 directions</em></p>
+                </div>
+
+                <div class="game-status" id="game4-status">
+                    <div class="status-message">Ready to start</div>
+                </div>
+
+                <!-- Peripheral Display Area -->
+                <div class="peripheral-zone" id="peripheral-zone">
+                    <!-- Top peripheral number -->
+                    <div class="peripheral-number peripheral-top" id="peripheral-top"></div>
+
+                    <!-- Left peripheral number -->
+                    <div class="peripheral-number peripheral-left" id="peripheral-left"></div>
+
+                    <!-- Center focus point -->
+                    <div class="focus-point" id="focus-point">
+                        <div class="focus-dot"></div>
+                        <div class="focus-ring"></div>
+                    </div>
+
+                    <!-- Right peripheral number -->
+                    <div class="peripheral-number peripheral-right" id="peripheral-right"></div>
+
+                    <!-- Bottom peripheral number -->
+                    <div class="peripheral-number peripheral-bottom" id="peripheral-bottom"></div>
+                </div>
+
+                <!-- Number Input Keypad -->
+                <div class="number-keypad" id="number-keypad" style="display: none;">
+                    <div class="keypad-title">Enter the number you saw:</div>
+                    <div class="keypad-buttons" id="keypad-buttons">
+                        <!-- Buttons dynamically generated based on difficulty -->
+                    </div>
+                </div>
+
+                <div class="game-controls">
+                    <button class="control-btn start-btn" id="game4-start">Start Training</button>
+                    <button class="control-btn stop-btn" id="game4-stop" disabled>Stop</button>
+                </div>
+
+                <div class="stats" id="game4-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Round:</span>
+                        <span class="stat-value" id="game4-round">0/0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Score:</span>
+                        <span class="stat-value" id="game4-score">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Correct:</span>
+                        <span class="stat-value correct" id="game4-correct">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Wrong:</span>
+                        <span class="stat-value wrong" id="game4-wrong">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Missed:</span>
+                        <span class="stat-value missed" id="game4-missed">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Accuracy:</span>
+                        <span class="stat-value" id="game4-accuracy">0%</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Avg Time:</span>
+                        <span class="stat-value" id="game4-avg-time">0ms</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Streak:</span>
+                        <span class="stat-value" id="game4-streak">0</span>
+                    </div>
+                </div>
+
+                <div class="results-panel" id="game4-results-panel" style="display: none;">
+                    <h3>Session Complete!</h3>
+                    <div class="results-grid">
+                        <div class="result-item">
+                            <span class="result-label">Total Rounds:</span>
+                            <span class="result-value" id="game4-result-rounds">0</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Correct:</span>
+                            <span class="result-value" id="game4-result-correct">0</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Wrong:</span>
+                            <span class="result-value" id="game4-result-wrong">0</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Missed:</span>
+                            <span class="result-value" id="game4-result-missed">0</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Accuracy:</span>
+                            <span class="result-value" id="game4-result-accuracy">0%</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Avg Response:</span>
+                            <span class="result-value" id="game4-result-avg-time">-</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Best Time:</span>
+                            <span class="result-value" id="game4-result-best-time">-</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Final Score:</span>
+                            <span class="result-value" id="game4-result-score">0</span>
+                        </div>
+                    </div>
+
+                    <!-- Side Bias Analysis -->
+                    <div class="side-bias-panel">
+                        <h4>Directional Performance Analysis</h4>
+                        <div class="side-stats">
+                            <div class="side-stat">
+                                <span class="side-label">Left:</span>
+                                <span class="side-accuracy" id="left-accuracy">0%</span>
+                                <span class="side-count" id="left-count">(0 appearances)</span>
+                            </div>
+                            <div class="side-stat">
+                                <span class="side-label">Right:</span>
+                                <span class="side-accuracy" id="right-accuracy">0%</span>
+                                <span class="side-count" id="right-count">(0 appearances)</span>
+                            </div>
+                            <div class="side-stat">
+                                <span class="side-label">Top:</span>
+                                <span class="side-accuracy" id="top-accuracy">0%</span>
+                                <span class="side-count" id="top-count">(0 appearances)</span>
+                            </div>
+                            <div class="side-stat">
+                                <span class="side-label">Bottom:</span>
+                                <span class="side-accuracy" id="bottom-accuracy">0%</span>
+                                <span class="side-count" id="bottom-count">(0 appearances)</span>
+                            </div>
+                        </div>
+                        <div class="side-recommendation" id="side-recommendation"></div>
+                    </div>
+
+                    <div class="performance-rating" id="game4-performance-rating"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Guide Modal -->
+    <div class="guide-modal" id="guide-modal">
+        <div class="guide-modal-content">
+            <button class="guide-close-btn" id="guide-close-btn">&times;</button>
+            <div class="guide-body" id="guide-body">
+                <!-- Guide content will be dynamically inserted here -->
             </div>
         </div>
     </div>

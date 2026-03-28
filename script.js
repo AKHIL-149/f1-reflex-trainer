@@ -1148,6 +1148,577 @@ function flashCard(gameId, type) {
 }
 
 // ===========================
+// GAME 4: PERIPHERAL NUMBER RECOGNITION
+// ===========================
+
+// Game 4 difficulty settings
+const GAME4_SETTINGS = {
+    easy: {
+        minDelay: 2000,
+        maxDelay: 5000,
+        numberVisibility: 2000,
+        responseWindow: 3000,
+        totalRounds: 20,
+        numberRange: { min: 1, max: 5 },
+        peripheralDistance: '25%',
+        fontSize: '4em',
+        pointsCorrect: 100,
+        pointsWrong: -20,
+        pointsMissed: -30,
+        speedBonusMultiplier: 0.5,
+        directions: ['left', 'right'], // Only horizontal
+        directionWeights: { left: 0.5, right: 0.5, top: 0, bottom: 0 }
+    },
+    medium: {
+        minDelay: 1500,
+        maxDelay: 3500,
+        numberVisibility: 1200,
+        responseWindow: 2000,
+        totalRounds: 30,
+        numberRange: { min: 1, max: 9 },
+        peripheralDistance: '35%',
+        fontSize: '3em',
+        pointsCorrect: 150,
+        pointsWrong: -40,
+        pointsMissed: -50,
+        speedBonusMultiplier: 1.0,
+        directions: ['left', 'right', 'top', 'bottom'], // All directions
+        directionWeights: { left: 0.35, right: 0.35, top: 0.15, bottom: 0.15 } // 70% horizontal, 30% vertical
+    },
+    hard: {
+        minDelay: 500,
+        maxDelay: 2500,
+        numberVisibility: 700,
+        responseWindow: 1500,
+        totalRounds: 40,
+        numberRange: { min: 0, max: 9 },
+        peripheralDistance: '42%',
+        fontSize: '2.5em',
+        pointsCorrect: 200,
+        pointsWrong: -60,
+        pointsMissed: -80,
+        speedBonusMultiplier: 1.5,
+        directions: ['left', 'right', 'top', 'bottom'], // All directions
+        directionWeights: { left: 0.25, right: 0.25, top: 0.25, bottom: 0.25 } // Equal distribution
+    }
+};
+
+const game4 = {
+    isActive: false,
+    currentRound: 0,
+    currentNumber: null,
+    currentDirection: null,
+    numberShownTime: null,
+    settings: null,
+    timeoutId: null,
+    responseTimeoutId: null,
+    stats: {
+        correct: 0,
+        wrong: 0,
+        missed: 0,
+        reactionTimes: [],
+        score: 0,
+        currentStreak: 0,
+        bestStreak: 0,
+        leftSide: { appearances: 0, correct: 0 },
+        rightSide: { appearances: 0, correct: 0 },
+        topSide: { appearances: 0, correct: 0 },
+        bottomSide: { appearances: 0, correct: 0 }
+    }
+};
+
+function startGame4() {
+    if (game4.isActive) return;
+
+    // Reset state
+    game4.stats = {
+        correct: 0,
+        wrong: 0,
+        missed: 0,
+        reactionTimes: [],
+        score: 0,
+        currentStreak: 0,
+        bestStreak: 0,
+        leftSide: { appearances: 0, correct: 0 },
+        rightSide: { appearances: 0, correct: 0 },
+        topSide: { appearances: 0, correct: 0 },
+        bottomSide: { appearances: 0, correct: 0 }
+    };
+    game4.currentRound = 0;
+    game4.currentNumber = null;
+    game4.currentDirection = null;
+
+    // Get difficulty settings
+    game4.settings = GAME4_SETTINGS[currentDifficulty];
+
+    // Update peripheral distances and font sizes
+    document.querySelector('.peripheral-left').style.left = game4.settings.peripheralDistance;
+    document.querySelector('.peripheral-right').style.right = game4.settings.peripheralDistance;
+    document.querySelector('.peripheral-top').style.top = game4.settings.peripheralDistance;
+    document.querySelector('.peripheral-bottom').style.bottom = game4.settings.peripheralDistance;
+    document.querySelectorAll('.peripheral-number').forEach(el => {
+        el.style.fontSize = game4.settings.fontSize;
+    });
+
+    // Initialize keypad
+    initializeGame4Keypad();
+
+    // Update UI
+    updateGame4Stats();
+    document.getElementById('game4-results-panel').style.display = 'none';
+    document.getElementById('game4-instructions').style.display = 'none';
+    document.getElementById('game4-start').disabled = true;
+    document.getElementById('game4-stop').disabled = false;
+    document.getElementById('peripheral-zone').setAttribute('data-active', 'true');
+
+    // Show countdown
+    showGame4Countdown(() => {
+        game4.isActive = true;
+        speak('Game 4 starting. Keep your eyes on the center point');
+        updateGame4Status('Focus on the center. Do not move your eyes!');
+        nextGame4Round();
+    });
+}
+
+function stopGame4() {
+    game4.isActive = false;
+    if (game4.timeoutId) clearTimeout(game4.timeoutId);
+    if (game4.responseTimeoutId) clearTimeout(game4.responseTimeoutId);
+
+    // Hide any visible numbers
+    hidePeripheralNumbers();
+
+    document.getElementById('game4-start').disabled = false;
+    document.getElementById('game4-stop').disabled = true;
+    document.getElementById('number-keypad').style.display = 'none';
+    document.getElementById('peripheral-zone').setAttribute('data-active', 'false');
+    document.getElementById('game4-instructions').style.display = 'block';
+
+    speak('Game 4 stopped');
+    updateGame4Status('Ready to start');
+}
+
+function initializeGame4Keypad() {
+    const keypadButtons = document.getElementById('keypad-buttons');
+    keypadButtons.innerHTML = '';
+
+    const { min, max } = game4.settings.numberRange;
+
+    for (let i = min; i <= max; i++) {
+        const btn = document.createElement('button');
+        btn.className = 'number-btn';
+        btn.textContent = i;
+        btn.dataset.number = i;
+        btn.addEventListener('click', () => handleGame4NumberInput(i));
+        keypadButtons.appendChild(btn);
+    }
+}
+
+function showGame4Countdown(callback) {
+    const zone = document.getElementById('peripheral-zone');
+    const counts = ['3', '2', '1', 'GO!'];
+    let index = 0;
+
+    // Temporarily show countdown in center
+    const countdownEl = document.createElement('div');
+    countdownEl.style.cssText = `
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 5em;
+        font-weight: bold;
+        color: white;
+        z-index: 100;
+        text-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+    `;
+    zone.appendChild(countdownEl);
+
+    function showNext() {
+        if (index < counts.length) {
+            countdownEl.textContent = counts[index];
+            speak(counts[index] === 'GO!' ? 'Go' : counts[index]);
+            playBeep(400 + (index * 100), 200);
+            index++;
+            setTimeout(showNext, 800);
+        } else {
+            countdownEl.remove();
+            callback();
+        }
+    }
+
+    showNext();
+}
+
+function nextGame4Round() {
+    if (!game4.isActive) return;
+
+    game4.currentRound++;
+
+    // Check if game is complete
+    if (game4.currentRound > game4.settings.totalRounds) {
+        endGame4();
+        return;
+    }
+
+    updateGame4Stats();
+
+    // Ensure clean state before next round
+    hidePeripheralNumbers();
+    document.getElementById('number-keypad').style.display = 'none';
+
+    // Disable all keypad buttons to prevent accidental clicks
+    document.querySelectorAll('.number-btn').forEach(btn => {
+        btn.disabled = true;
+    });
+
+    // Show "Get Ready" message
+    updateGame4Status(`Round ${game4.currentRound}/${game4.settings.totalRounds} - Get ready...`);
+
+    // Brief pause before starting (500ms) to let user reset
+    setTimeout(() => {
+        if (!game4.isActive) return;
+
+        updateGame4Status(`Focus on center...`);
+
+        // Random delay before showing number
+        const delay = Math.random() * (game4.settings.maxDelay - game4.settings.minDelay) + game4.settings.minDelay;
+
+        game4.timeoutId = setTimeout(() => {
+            if (!game4.isActive) return;
+            showPeripheralNumber();
+        }, delay);
+    }, 500);
+}
+
+function showPeripheralNumber() {
+    // Generate random number within range
+    const { min, max } = game4.settings.numberRange;
+    game4.currentNumber = Math.floor(Math.random() * (max - min + 1)) + min;
+
+    // Weighted random direction selection based on difficulty
+    const directions = game4.settings.directions;
+    const weights = game4.settings.directionWeights;
+
+    // Create cumulative weight array
+    const rand = Math.random();
+    let cumulative = 0;
+    let selectedDirection = directions[0];
+
+    for (const dir of directions) {
+        cumulative += weights[dir];
+        if (rand <= cumulative) {
+            selectedDirection = dir;
+            break;
+        }
+    }
+
+    game4.currentDirection = selectedDirection;
+
+    // Track appearance by direction
+    if (game4.currentDirection === 'left') {
+        game4.stats.leftSide.appearances++;
+    } else if (game4.currentDirection === 'right') {
+        game4.stats.rightSide.appearances++;
+    } else if (game4.currentDirection === 'top') {
+        game4.stats.topSide.appearances++;
+    } else if (game4.currentDirection === 'bottom') {
+        game4.stats.bottomSide.appearances++;
+    }
+
+    // Display the number
+    const elementId = `peripheral-${game4.currentDirection}`;
+    const element = document.getElementById(elementId);
+    element.textContent = game4.currentNumber;
+    element.classList.add('visible');
+
+    game4.numberShownTime = Date.now();
+
+    // Play subtle beep
+    playBeep(600, 100);
+
+    // Hide number after visibility duration
+    game4.timeoutId = setTimeout(() => {
+        if (!game4.isActive) return;
+        hidePeripheralNumbers();
+        enableNumberInput();
+    }, game4.settings.numberVisibility);
+}
+
+function hidePeripheralNumbers() {
+    document.querySelectorAll('.peripheral-number').forEach(el => {
+        el.classList.remove('visible');
+        el.textContent = '';
+    });
+}
+
+function enableNumberInput() {
+    const keypad = document.getElementById('number-keypad');
+    keypad.style.display = 'block';
+
+    // Enable all buttons
+    document.querySelectorAll('.number-btn').forEach(btn => {
+        btn.disabled = false;
+    });
+
+    updateGame4Status('What number did you see?');
+
+    // Set timeout for response window
+    game4.responseTimeoutId = setTimeout(() => {
+        if (!game4.isActive || keypad.style.display !== 'block') return;
+        handleGame4Missed();
+    }, game4.settings.responseWindow);
+}
+
+function handleGame4NumberInput(inputNumber) {
+    if (!game4.isActive) return;
+
+    clearTimeout(game4.responseTimeoutId);
+
+    // Disable all buttons
+    document.querySelectorAll('.number-btn').forEach(btn => {
+        btn.disabled = true;
+    });
+
+    const reactionTime = Date.now() - game4.numberShownTime;
+
+    if (inputNumber === game4.currentNumber) {
+        // Correct answer
+        game4.stats.correct++;
+        game4.stats.currentStreak++;
+        game4.stats.reactionTimes.push(reactionTime);
+
+        // Track direction-specific performance
+        if (game4.currentDirection === 'left') {
+            game4.stats.leftSide.correct++;
+        } else if (game4.currentDirection === 'right') {
+            game4.stats.rightSide.correct++;
+        } else if (game4.currentDirection === 'top') {
+            game4.stats.topSide.correct++;
+        } else if (game4.currentDirection === 'bottom') {
+            game4.stats.bottomSide.correct++;
+        }
+
+        if (game4.stats.currentStreak > game4.stats.bestStreak) {
+            game4.stats.bestStreak = game4.stats.currentStreak;
+        }
+
+        // Calculate points with speed bonus
+        let points = game4.settings.pointsCorrect;
+        const speedBonus = Math.floor(
+            (game4.settings.responseWindow - reactionTime) / 10 * game4.settings.speedBonusMultiplier
+        );
+        points += Math.max(0, speedBonus);
+
+        game4.stats.score += points;
+
+        playBeep(1000, 200);
+        speak('Correct');
+        updateGame4Status(`Correct! +${points} points (${reactionTime}ms) - ${game4.currentDirection}`);
+        flashCard('game4', 'correct');
+    } else {
+        // Wrong answer
+        game4.stats.wrong++;
+        game4.stats.currentStreak = 0;
+        game4.stats.score += game4.settings.pointsWrong;
+
+        playBeep(200, 400);
+        speak('Wrong');
+        updateGame4Status(`Wrong! ${game4.settings.pointsWrong} points - Correct answer was ${game4.currentNumber}`);
+        flashCard('game4', 'wrong');
+    }
+
+    updateGame4Stats();
+
+    // Next round after delay
+    setTimeout(() => {
+        if (game4.isActive) {
+            nextGame4Round();
+        }
+    }, 1500);
+}
+
+function handleGame4Missed() {
+    if (!game4.isActive) return;
+
+    game4.stats.missed++;
+    game4.stats.currentStreak = 0;
+    game4.stats.score += game4.settings.pointsMissed;
+
+    playBeep(150, 600);
+    speak('Missed');
+    updateGame4Status(`Missed! ${game4.settings.pointsMissed} points - Number was ${game4.currentNumber}`);
+    flashCard('game4', 'missed');
+
+    updateGame4Stats();
+
+    // Next round after delay
+    setTimeout(() => {
+        if (game4.isActive) {
+            nextGame4Round();
+        }
+    }, 1500);
+}
+
+function endGame4() {
+    game4.isActive = false;
+    document.getElementById('number-keypad').style.display = 'none';
+    document.getElementById('peripheral-zone').setAttribute('data-active', 'false');
+    document.getElementById('game4-stop').disabled = true;
+    hidePeripheralNumbers();
+
+    // Show results
+    displayGame4Results();
+    speak('Session complete');
+}
+
+function displayGame4Results() {
+    const resultsPanel = document.getElementById('game4-results-panel');
+    resultsPanel.style.display = 'block';
+
+    // Populate basic results
+    document.getElementById('game4-result-rounds').textContent = game4.settings.totalRounds;
+    document.getElementById('game4-result-correct').textContent = game4.stats.correct;
+    document.getElementById('game4-result-wrong').textContent = game4.stats.wrong;
+    document.getElementById('game4-result-missed').textContent = game4.stats.missed;
+    document.getElementById('game4-result-score').textContent = game4.stats.score;
+
+    // Calculate accuracy
+    const totalAttempts = game4.stats.correct + game4.stats.wrong + game4.stats.missed;
+    const accuracy = totalAttempts > 0 ? ((game4.stats.correct / totalAttempts) * 100).toFixed(1) : 0;
+    document.getElementById('game4-result-accuracy').textContent = `${accuracy}%`;
+
+    // Reaction times
+    if (game4.stats.reactionTimes.length > 0) {
+        const avgTime = Math.round(
+            game4.stats.reactionTimes.reduce((a, b) => a + b, 0) / game4.stats.reactionTimes.length
+        );
+        const bestTime = Math.min(...game4.stats.reactionTimes);
+        document.getElementById('game4-result-avg-time').textContent = `${avgTime}ms`;
+        document.getElementById('game4-result-best-time').textContent = `${bestTime}ms`;
+    } else {
+        document.getElementById('game4-result-avg-time').textContent = '-';
+        document.getElementById('game4-result-best-time').textContent = '-';
+    }
+
+    // Directional bias analysis
+    const leftAccuracy = game4.stats.leftSide.appearances > 0
+        ? ((game4.stats.leftSide.correct / game4.stats.leftSide.appearances) * 100).toFixed(1)
+        : 0;
+    const rightAccuracy = game4.stats.rightSide.appearances > 0
+        ? ((game4.stats.rightSide.correct / game4.stats.rightSide.appearances) * 100).toFixed(1)
+        : 0;
+    const topAccuracy = game4.stats.topSide.appearances > 0
+        ? ((game4.stats.topSide.correct / game4.stats.topSide.appearances) * 100).toFixed(1)
+        : 0;
+    const bottomAccuracy = game4.stats.bottomSide.appearances > 0
+        ? ((game4.stats.bottomSide.correct / game4.stats.bottomSide.appearances) * 100).toFixed(1)
+        : 0;
+
+    document.getElementById('left-accuracy').textContent = `${leftAccuracy}%`;
+    document.getElementById('left-count').textContent = `(${game4.stats.leftSide.appearances} appearances)`;
+    document.getElementById('right-accuracy').textContent = `${rightAccuracy}%`;
+    document.getElementById('right-count').textContent = `(${game4.stats.rightSide.appearances} appearances)`;
+    document.getElementById('top-accuracy').textContent = `${topAccuracy}%`;
+    document.getElementById('top-count').textContent = `(${game4.stats.topSide.appearances} appearances)`;
+    document.getElementById('bottom-accuracy').textContent = `${bottomAccuracy}%`;
+    document.getElementById('bottom-count').textContent = `(${game4.stats.bottomSide.appearances} appearances)`;
+
+    // Directional recommendation
+    const recommendationEl = document.getElementById('side-recommendation');
+    const directions = [
+        { name: 'left', accuracy: parseFloat(leftAccuracy), appearances: game4.stats.leftSide.appearances },
+        { name: 'right', accuracy: parseFloat(rightAccuracy), appearances: game4.stats.rightSide.appearances },
+        { name: 'top', accuracy: parseFloat(topAccuracy), appearances: game4.stats.topSide.appearances },
+        { name: 'bottom', accuracy: parseFloat(bottomAccuracy), appearances: game4.stats.bottomSide.appearances }
+    ];
+
+    // Filter out directions with no appearances
+    const activeDirections = directions.filter(d => d.appearances > 0);
+
+    if (activeDirections.length === 0) {
+        recommendationEl.textContent = '';
+        return;
+    }
+
+    // Find best and worst performing directions
+    const sortedByAccuracy = [...activeDirections].sort((a, b) => b.accuracy - a.accuracy);
+    const best = sortedByAccuracy[0];
+    const worst = sortedByAccuracy[sortedByAccuracy.length - 1];
+    const accuracyDiff = best.accuracy - worst.accuracy;
+
+    // Calculate horizontal vs vertical performance
+    const horizontalAvg = activeDirections
+        .filter(d => d.name === 'left' || d.name === 'right')
+        .reduce((sum, d) => sum + d.accuracy, 0) / activeDirections.filter(d => d.name === 'left' || d.name === 'right').length;
+
+    const verticalAvg = activeDirections
+        .filter(d => d.name === 'top' || d.name === 'bottom')
+        .reduce((sum, d) => sum + d.accuracy, 0) / activeDirections.filter(d => d.name === 'top' || d.name === 'bottom').length;
+
+    const hvDiff = Math.abs(horizontalAvg - verticalAvg);
+
+    if (accuracyDiff > 20) {
+        recommendationEl.textContent = `⚠️ Your ${worst.name} peripheral vision needs significant practice! (${worst.accuracy}% vs ${best.accuracy}% ${best.name})`;
+        recommendationEl.style.color = '#ff9900';
+    } else if (accuracyDiff > 10) {
+        recommendationEl.textContent = `Your ${worst.name} side is weaker (${worst.accuracy}%). Focus more training on that direction.`;
+        recommendationEl.style.color = '#ffcc00';
+    } else if (hvDiff > 15 && !isNaN(verticalAvg)) {
+        const weaker = horizontalAvg < verticalAvg ? 'horizontal (left/right)' : 'vertical (top/bottom)';
+        recommendationEl.textContent = `Your ${weaker} peripheral awareness needs more practice.`;
+        recommendationEl.style.color = '#ffcc00';
+    } else {
+        recommendationEl.textContent = '✓ Excellent! Your peripheral vision is well balanced across all directions.';
+        recommendationEl.style.color = '#00cc66';
+    }
+
+    // Performance rating
+    const ratingElement = document.getElementById('game4-performance-rating');
+    let ratingClass, ratingText;
+
+    if (parseFloat(accuracy) >= 80 && game4.stats.score > game4.settings.totalRounds * 100) {
+        ratingClass = 'excellent';
+        ratingText = 'Performance: Excellent - Elite Peripheral Awareness';
+    } else if (parseFloat(accuracy) >= 60 && game4.stats.score > 0) {
+        ratingClass = 'good';
+        ratingText = 'Performance: Good - Solid Peripheral Recognition';
+    } else {
+        ratingClass = 'needs-improvement';
+        ratingText = 'Performance: Needs Improvement - Keep Training';
+    }
+
+    ratingElement.textContent = ratingText;
+    ratingElement.className = `performance-rating ${ratingClass}`;
+}
+
+function updateGame4Status(message) {
+    document.querySelector('#game4-status .status-message').textContent = message;
+}
+
+function updateGame4Stats() {
+    document.getElementById('game4-round').textContent = `${game4.currentRound}/${game4.settings?.totalRounds || 0}`;
+    document.getElementById('game4-score').textContent = game4.stats.score;
+    document.getElementById('game4-correct').textContent = game4.stats.correct;
+    document.getElementById('game4-wrong').textContent = game4.stats.wrong;
+    document.getElementById('game4-missed').textContent = game4.stats.missed;
+    document.getElementById('game4-streak').textContent = game4.stats.currentStreak;
+
+    const totalAttempts = game4.stats.correct + game4.stats.wrong + game4.stats.missed;
+    const accuracy = totalAttempts > 0 ? ((game4.stats.correct / totalAttempts) * 100).toFixed(1) : 0;
+    document.getElementById('game4-accuracy').textContent = `${accuracy}%`;
+
+    if (game4.stats.reactionTimes.length > 0) {
+        const avgTime = Math.round(
+            game4.stats.reactionTimes.reduce((a, b) => a + b, 0) / game4.stats.reactionTimes.length
+        );
+        document.getElementById('game4-avg-time').textContent = `${avgTime}ms`;
+    } else {
+        document.getElementById('game4-avg-time').textContent = '0ms';
+    }
+}
+
+// ===========================
 // EVENT LISTENERS
 // ===========================
 
@@ -1164,6 +1735,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (game3.isActive) {
                 stopGame3();
+            }
+            if (game4.isActive) {
+                stopGame4();
             }
 
             // Update active button
@@ -1325,6 +1899,403 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === ' ' && tapZone.getAttribute('data-enabled') === 'true') {
             e.preventDefault();
             handleGame3Tap();
+        }
+    });
+
+    // Game 4 controls
+    document.getElementById('game4-start').addEventListener('click', startGame4);
+    document.getElementById('game4-stop').addEventListener('click', stopGame4);
+
+    // ===========================
+    // GAME GUIDE MODAL SYSTEM
+    // ===========================
+
+    const guideModal = document.getElementById('guide-modal');
+    const guideBody = document.getElementById('guide-body');
+    const guideCloseBtn = document.getElementById('guide-close-btn');
+
+    // Guide content for all games
+    const guideContent = {
+        game1: `
+            <h2>🎯 Game 1: Left/Right Buzzer</h2>
+
+            <h3>Game Objective</h3>
+            <p>Train your reaction speed and directional awareness by pressing the correct buzzer (left or right) as quickly as possible when called out.</p>
+
+            <h3>How to Play</h3>
+            <ol>
+                <li><strong>Select Difficulty:</strong> Choose Easy, Medium, or Hard from the dropdown menu</li>
+                <li><strong>Start Training:</strong> Click the "Start Training" button</li>
+                <li><strong>Listen & React:</strong> You'll hear a voice say "LEFT" or "RIGHT"</li>
+                <li><strong>Press the Buzzer:</strong> Quickly press the corresponding buzzer button</li>
+                <li><strong>Track Your Stats:</strong> Monitor your correct/wrong/missed responses and reaction times</li>
+            </ol>
+
+            <h3>Controls</h3>
+            <ul>
+                <li><strong>Mouse/Touch:</strong> Click or tap the buzzer buttons</li>
+                <li><strong>Keyboard:</strong> Left Arrow or 'A' for left buzzer, Right Arrow or 'D' for right buzzer</li>
+            </ul>
+
+            <h3>Difficulty Levels</h3>
+            <table class="difficulty-table">
+                <tr>
+                    <th>Difficulty</th>
+                    <th>Delay Range</th>
+                    <th>Response Window</th>
+                </tr>
+                <tr>
+                    <td><strong>Easy</strong></td>
+                    <td>3-5 seconds</td>
+                    <td>More forgiving</td>
+                </tr>
+                <tr>
+                    <td><strong>Medium</strong></td>
+                    <td>2-4 seconds</td>
+                    <td>Balanced challenge</td>
+                </tr>
+                <tr>
+                    <td><strong>Hard</strong></td>
+                    <td>1-3 seconds</td>
+                    <td>Requires elite reflexes</td>
+                </tr>
+            </table>
+
+            <div class="guide-tip">
+                <strong>Training Tips:</strong>
+                <ul>
+                    <li>Stay focused and anticipate the callout</li>
+                    <li>Position your hands ready over both buzzers</li>
+                    <li>Don't guess - wait for the actual callout</li>
+                    <li>Track your average reaction time and try to improve it</li>
+                    <li>Start with Easy mode to build consistency</li>
+                </ul>
+            </div>
+
+            <h3>Scoring</h3>
+            <ul>
+                <li><strong>Correct:</strong> Press the right buzzer within the time limit</li>
+                <li><strong>Wrong:</strong> Press the wrong buzzer</li>
+                <li><strong>Missed:</strong> Don't respond in time</li>
+            </ul>
+        `,
+
+        game2: `
+            <h2>⚡ Game 2: Ball Drop Catch</h2>
+
+            <h3>Game Objective</h3>
+            <p>Physical reaction training! Drop a real ball and catch it with the hand (or hands) called out. This trains hand-eye coordination and selective hand response.</p>
+
+            <h3>How to Play</h3>
+            <ol>
+                <li><strong>Customize Timing:</strong> Set your preferred delay time for each difficulty level (5-30 seconds)</li>
+                <li><strong>Select Difficulty:</strong> Choose Easy, Medium, or Hard</li>
+                <li><strong>Prepare:</strong> Hold a ball in your hands above waist height</li>
+                <li><strong>Start Training:</strong> Click "Start Training" and get ready</li>
+                <li><strong>Listen for Callout:</strong> You'll hear "LEFT", "RIGHT", or "BOTH HANDS"</li>
+                <li><strong>Drop & Catch:</strong> Drop the ball and catch it with the specified hand(s)</li>
+                <li><strong>Confirm:</strong> Tap the green zone or press spacebar once you've caught it</li>
+            </ol>
+
+            <h3>Controls</h3>
+            <ul>
+                <li><strong>Mouse/Touch:</strong> Tap the green "Tap Here After Catching" zone</li>
+                <li><strong>Keyboard:</strong> Spacebar or Enter key</li>
+            </ul>
+
+            <h3>Difficulty Levels</h3>
+            <table class="difficulty-table">
+                <tr>
+                    <th>Difficulty</th>
+                    <th>Default Delay</th>
+                    <th>Both Hands Frequency</th>
+                </tr>
+                <tr>
+                    <td><strong>Easy</strong></td>
+                    <td>15 seconds</td>
+                    <td>0% (Left/Right only)</td>
+                </tr>
+                <tr>
+                    <td><strong>Medium</strong></td>
+                    <td>11 seconds</td>
+                    <td>10% chance</td>
+                </tr>
+                <tr>
+                    <td><strong>Hard</strong></td>
+                    <td>7 seconds</td>
+                    <td>30% chance</td>
+                </tr>
+            </table>
+
+            <div class="guide-warning">
+                <strong>Important:</strong> This is a physical training exercise! Make sure you're in a safe space with enough room to drop and catch a ball. Use a soft ball to avoid injury or damage.
+            </div>
+
+            <div class="guide-tip">
+                <strong>Training Tips:</strong>
+                <ul>
+                    <li>Use a tennis ball or similar soft ball</li>
+                    <li>Stand in a clear area with good lighting</li>
+                    <li>Keep the ball at chest height before dropping</li>
+                    <li>Stay relaxed and react naturally to the callout</li>
+                    <li>On "BOTH HANDS", catch with both hands simultaneously</li>
+                    <li>Adjust the delay times to match your preferred training pace</li>
+                </ul>
+            </div>
+
+            <h3>Customization</h3>
+            <p>You can customize the delay time for each difficulty level between 5-30 seconds. This allows you to tailor the training to your preference and gradually increase difficulty as you improve.</p>
+        `,
+
+        game3: `
+            <h2>🎨 Game 3: Random Screen Tap</h2>
+
+            <h3>Game Objective</h3>
+            <p>Train selective attention and impulse control! The screen flashes different colors rapidly. You must tap ONLY when your target color(s) appear, and avoid tapping on other colors.</p>
+
+            <h3>How to Play</h3>
+            <ol>
+                <li><strong>Select Target Color(s):</strong> Choose which color(s) you should tap on (at least one required)</li>
+                <li><strong>Choose Game Mode:</strong>
+                    <ul>
+                        <li><strong>Normal Mode:</strong> Each round shows one color at a time</li>
+                        <li><strong>Burst Mode:</strong> Multiple rapid flashes in succession - stay focused!</li>
+                    </ul>
+                </li>
+                <li><strong>Set Rounds:</strong> Choose how many rounds you want to play (10-100)</li>
+                <li><strong>Select Difficulty:</strong> Choose Easy, Medium, or Hard</li>
+                <li><strong>Start Training:</strong> The screen will begin flashing colors</li>
+                <li><strong>React Correctly:</strong>
+                    <ul>
+                        <li>Tap when you see your target color</li>
+                        <li>DO NOT tap on other colors</li>
+                        <li>In Burst Mode, react to each flash independently</li>
+                    </ul>
+                </li>
+            </ol>
+
+            <h3>Controls</h3>
+            <ul>
+                <li><strong>Mouse/Touch:</strong> Click or tap anywhere on the colored screen area</li>
+                <li><strong>Keyboard:</strong> Spacebar</li>
+            </ul>
+
+            <h3>Difficulty Levels</h3>
+            <table class="difficulty-table">
+                <tr>
+                    <th>Difficulty</th>
+                    <th>Flash Duration</th>
+                    <th>Between Flashes</th>
+                    <th>Challenge</th>
+                </tr>
+                <tr>
+                    <td><strong>Easy</strong></td>
+                    <td>1000ms (1s)</td>
+                    <td>800ms</td>
+                    <td>Comfortable timing</td>
+                </tr>
+                <tr>
+                    <td><strong>Medium</strong></td>
+                    <td>700ms</td>
+                    <td>500ms</td>
+                    <td>Requires focus</td>
+                </tr>
+                <tr>
+                    <td><strong>Hard</strong></td>
+                    <td>400ms</td>
+                    <td>300ms</td>
+                    <td>Extremely fast reactions</td>
+                </tr>
+            </table>
+
+            <h3>Game Modes</h3>
+            <h4>Normal Mode</h4>
+            <p>Colors appear one at a time with pauses in between. Good for learning and building accuracy.</p>
+
+            <h4>Burst Mode</h4>
+            <p>Multiple colors flash in rapid succession (3-7 flashes per burst). Much more challenging! Tests your ability to react to each individual flash correctly.</p>
+
+            <div class="guide-tip">
+                <strong>Training Tips:</strong>
+                <ul>
+                    <li>Start by selecting just one target color to build confidence</li>
+                    <li>Gradually add more target colors to increase difficulty</li>
+                    <li>In Burst Mode, stay calm and react to each flash independently</li>
+                    <li>Focus on accuracy over speed - wrong taps hurt your score!</li>
+                    <li>Track your accuracy percentage and aim for 90%+ on your target colors</li>
+                    <li>Use shorter rounds (10-20) for intense training sessions</li>
+                </ul>
+            </div>
+
+            <h3>Scoring</h3>
+            <ul>
+                <li><strong>Correct Tap:</strong> Tap when target color appears</li>
+                <li><strong>Wrong Tap:</strong> Tap when non-target color appears</li>
+                <li><strong>Missed:</strong> Fail to tap when target color appears</li>
+                <li><strong>Correct Ignore:</strong> Don't tap when non-target color appears (good!)</li>
+            </ul>
+
+            <h3>Available Colors</h3>
+            <p><strong>Easy/Medium:</strong> Red, Green, Blue, Yellow</p>
+            <p><strong>Hard:</strong> Red, Green, Blue, Yellow, Purple, Orange</p>
+        `,
+
+        game4: `
+            <h2>👁️ Game 4: Peripheral Number Recognition</h2>
+
+            <h3>Game Objective</h3>
+            <p>Train your peripheral vision awareness! Keep your eyes locked on the center focus point while identifying numbers that briefly flash in your peripheral vision (left, right, top, or bottom). This mimics how F1 drivers monitor their surroundings while focusing ahead.</p>
+
+            <div class="guide-warning">
+                <strong>Critical Rule:</strong> You MUST keep your eyes on the center red dot at all times! Do NOT move your eyes to look at the numbers. Use only your peripheral vision to detect and identify them.
+            </div>
+
+            <h3>How to Play</h3>
+            <ol>
+                <li><strong>Select Difficulty:</strong> Choose Easy, Medium, or Hard</li>
+                <li><strong>Start Training:</strong> Click "Start Training" - you'll see a countdown</li>
+                <li><strong>Focus on Center:</strong> Keep your eyes locked on the pulsing red center dot</li>
+                <li><strong>Wait for Number:</strong> After a random delay, a number will flash briefly on left, right, top, or bottom (depending on difficulty)</li>
+                <li><strong>Identify Number:</strong> Use your peripheral vision to see what number it was</li>
+                <li><strong>Enter Response:</strong> After the number disappears, a keypad appears - select the number you saw</li>
+                <li><strong>Next Round:</strong> After a brief pause, the next round begins</li>
+            </ol>
+
+            <h3>Controls</h3>
+            <ul>
+                <li><strong>Mouse/Touch:</strong> Tap the number buttons on the keypad</li>
+                <li><strong>Keyboard:</strong> Press the number keys (0-9 depending on difficulty)</li>
+            </ul>
+
+            <h3>Difficulty Levels</h3>
+            <table class="difficulty-table">
+                <tr>
+                    <th>Level</th>
+                    <th>Numbers</th>
+                    <th>Visible</th>
+                    <th>Response</th>
+                    <th>Rounds</th>
+                    <th>Directions</th>
+                </tr>
+                <tr>
+                    <td><strong>Easy</strong></td>
+                    <td>1-5</td>
+                    <td>2 sec</td>
+                    <td>3 sec</td>
+                    <td>20</td>
+                    <td>Left/Right only</td>
+                </tr>
+                <tr>
+                    <td><strong>Medium</strong></td>
+                    <td>1-9</td>
+                    <td>1.2 sec</td>
+                    <td>2 sec</td>
+                    <td>30</td>
+                    <td>All 4 (70% horizontal, 30% vertical)</td>
+                </tr>
+                <tr>
+                    <td><strong>Hard</strong></td>
+                    <td>0-9</td>
+                    <td>0.7 sec</td>
+                    <td>1.5 sec</td>
+                    <td>40</td>
+                    <td>All 4 (equal distribution)</td>
+                </tr>
+            </table>
+
+            <div class="guide-section">
+                <h4>Progressive Direction Training</h4>
+                <p><strong>Easy Mode:</strong> Master horizontal peripheral vision first with left/right only. Numbers appear closer (25%) and stay visible longer.</p>
+                <p><strong>Medium Mode:</strong> Introduces vertical awareness (top/bottom) with 70% horizontal and 30% vertical distribution. Numbers further out (35%).</p>
+                <p><strong>Hard Mode:</strong> Full 360° peripheral training with equal distribution across all four directions. Numbers at far edges (42%).</p>
+            </div>
+
+            <h3>Scoring System</h3>
+            <ul>
+                <li><strong>Correct:</strong> Base points + speed bonus for fast responses</li>
+                <li><strong>Wrong:</strong> Points penalty - but you still tried!</li>
+                <li><strong>Missed:</strong> Larger penalty for not responding in time</li>
+                <li><strong>Streak Bonus:</strong> Consecutive correct answers build your streak</li>
+            </ul>
+
+            <h3>Directional Performance Analysis</h3>
+            <p>After completing a session, you'll see detailed analysis of your peripheral performance across all directions:</p>
+            <ul>
+                <li><strong>Left Accuracy:</strong> How well you detect numbers on the left</li>
+                <li><strong>Right Accuracy:</strong> How well you detect numbers on the right</li>
+                <li><strong>Top Accuracy:</strong> How well you detect numbers above (Medium/Hard only)</li>
+                <li><strong>Bottom Accuracy:</strong> How well you detect numbers below (Medium/Hard only)</li>
+                <li><strong>Smart Recommendations:</strong> Get targeted advice on your weakest direction or horizontal vs vertical imbalance</li>
+            </ul>
+
+            <div class="guide-tip">
+                <strong>Training Tips:</strong>
+                <ul>
+                    <li><strong>Maintain Center Focus:</strong> This is the most important rule! Keep your eyes on the red dot</li>
+                    <li><strong>Relax Your Vision:</strong> Don't strain. Let your peripheral vision naturally pick up the numbers</li>
+                    <li><strong>Start with Easy:</strong> Build confidence with horizontal (left/right) awareness first</li>
+                    <li><strong>Progress to Medium:</strong> Once you master horizontal, add vertical (top/bottom) awareness</li>
+                    <li><strong>Master Hard Mode:</strong> Full 360° peripheral training with equal difficulty in all directions</li>
+                    <li><strong>Practice Consistently:</strong> Peripheral awareness improves significantly with regular training</li>
+                    <li><strong>Track Your Progress:</strong> Watch your directional analysis - aim for balanced performance across all directions</li>
+                    <li><strong>Don't Rush:</strong> Accuracy is more important than speed</li>
+                    <li><strong>Vertical is Harder:</strong> Most people find top/bottom peripheral vision more challenging than left/right</li>
+                </ul>
+            </div>
+
+            <div class="guide-warning">
+                <strong>Common Mistakes to Avoid:</strong>
+                <ul>
+                    <li>Moving your eyes to look at the numbers (defeats the purpose!)</li>
+                    <li>Guessing when you didn't see the number clearly</li>
+                    <li>Not taking breaks - peripheral training can be mentally fatiguing</li>
+                    <li>Starting on Hard mode before mastering Easy/Medium</li>
+                </ul>
+            </div>
+
+            <h3>Real-World Application</h3>
+            <p>F1 drivers must maintain focus on the track ahead while simultaneously monitoring competitors beside them, pit boards, marshal flags, and track conditions in their peripheral vision. This game trains that exact skill!</p>
+        `
+    };
+
+    // Open guide modal
+    function openGuide(gameName) {
+        if (guideContent[gameName]) {
+            guideBody.innerHTML = guideContent[gameName];
+            guideModal.classList.add('active');
+            speak('Opening game guide');
+        }
+    }
+
+    // Close guide modal
+    function closeGuide() {
+        guideModal.classList.remove('active');
+        speak('Closing guide');
+    }
+
+    // Event listeners for guide buttons
+    document.querySelectorAll('.guide-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const gameName = btn.getAttribute('data-guide');
+            openGuide(gameName);
+        });
+    });
+
+    // Close button
+    guideCloseBtn.addEventListener('click', closeGuide);
+
+    // Close when clicking outside modal content
+    guideModal.addEventListener('click', (e) => {
+        if (e.target === guideModal) {
+            closeGuide();
+        }
+    });
+
+    // Close with Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && guideModal.classList.contains('active')) {
+            closeGuide();
         }
     });
 
